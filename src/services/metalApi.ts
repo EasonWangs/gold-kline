@@ -37,6 +37,12 @@ const fetchRealMetalPrice = async (metal: MetalType = 'gold'): Promise<{ price: 
 
     // AKTools返回的是人民币/克价格
     let price = parseFloat(latestData.现价);
+
+    // 白银数据单位修正：千克价格转换为克价格
+    if (metal === 'silver' && price > 1000) {
+      price = price / 1000;
+    }
+
     let high = price * 1.01; // 估算当日高点
     let low = price * 0.99;  // 估算当日低点
     let change = 0; // AKTools API不提供变化数据
@@ -87,6 +93,14 @@ const fetchHistoricalData = async (metal: MetalType = 'gold', days: number = 30)
       let high = parseFloat(item.high);
       let low = parseFloat(item.low);
       let close = parseFloat(item.close);
+
+      // 白银数据单位修正：千克价格转换为克价格
+      if (metal === 'silver') {
+        if (open > 1000) open = open / 1000;
+        if (high > 1000) high = high / 1000;
+        if (low > 1000) low = low / 1000;
+        if (close > 1000) close = close / 1000;
+      }
 
       results.push({
         time: timestamp,
