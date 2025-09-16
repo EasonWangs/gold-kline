@@ -6,12 +6,6 @@
         贵金属实时监控
       </h1>
     </div>
-    <p class="text-slate-400 text-lg">
-      基于AKTools的黄金白银价格追踪系统
-    </p>
-    <p class="text-slate-500 text-sm mt-2">
-      实时数据 • 专业图表 • 人民币计价
-    </p>
   </header>
 </template>
 

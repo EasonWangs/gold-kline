@@ -79,7 +79,17 @@
         :style="{ left: tooltipData.x + 'px', top: tooltipData.y + 'px' }"
       >
         <div class="font-medium mb-2">{{ tooltipData.date }}</div>
-        <div class="space-y-1">
+
+        <!-- 1分钟线条图只显示当前价 -->
+        <div v-if="timeframe === '1m'" class="space-y-1">
+          <div class="flex justify-between space-x-4">
+            <span class="text-slate-400">当前价:</span>
+            <span class="font-medium">{{ currencyInfo.symbol }}{{ tooltipData.close }}</span>
+          </div>
+        </div>
+
+        <!-- 其他周期显示完整OHLC -->
+        <div v-else class="space-y-1">
           <div class="flex justify-between space-x-4">
             <span class="text-slate-400">开盘:</span>
             <span>{{ currencyInfo.symbol }}{{ tooltipData.open }}</span>
@@ -132,7 +142,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { createChart, type IChartApi, type ISeriesApi, type CandlestickData as LightweightCandlestickData, type Time } from 'lightweight-charts'
-import { fetchHistoricalData, getMetalName } from '../services/metalApi'
+import { fetchHistoricalData, fetchMinuteKlineData, getMetalName } from '../services/metalApi'
 import type { CandlestickData, MetalType } from '../types/gold'
 import { RefreshCw, AlertCircle, Coins, Gem } from 'lucide-vue-next'
 
@@ -157,6 +167,7 @@ const tooltipData = ref<{
 
 let chart: IChartApi | null = null
 let candlestickSeries: ISeriesApi<'Candlestick'> | null = null
+let lineSeries: ISeriesApi<'Line'> | null = null
 
 const timeframes = [
   { label: '1分钟', value: '1m' },
@@ -200,7 +211,7 @@ const initChart = async () => {
     timeScale: {
       borderColor: '#4b5563',
       timeVisible: true,
-      secondsVisible: false,
+      secondsVisible: timeframe.value === '1m', // 1分钟图显示秒数
       barSpacing: 8,
       rightOffset: 12,
       fixLeftEdge: false,
@@ -209,25 +220,30 @@ const initChart = async () => {
     },
   })
 
-  // 创建K线系列
-  candlestickSeries = chart.addCandlestickSeries({
-    upColor: '#10b981',
-    downColor: '#ef4444',
-    borderDownColor: '#ef4444',
-    borderUpColor: '#10b981',
-    wickDownColor: '#ef4444',
-    wickUpColor: '#10b981',
-  })
+  // 根据时间周期创建不同类型的图表系列
+  if (timeframe.value === '1m') {
+    // 1分钟使用线条图
+    lineSeries = chart.addLineSeries({
+      color: props.metal === 'gold' ? '#f59e0b' : '#94a3b8',
+      lineWidth: 2,
+      crosshairMarkerVisible: true,
+      crosshairMarkerRadius: 4,
+    })
+  } else {
+    // 其他时间周期使用蜡烛图
+    candlestickSeries = chart.addCandlestickSeries({
+      upColor: '#10b981',
+      downColor: '#ef4444',
+      borderDownColor: '#ef4444',
+      borderUpColor: '#10b981',
+      wickDownColor: '#ef4444',
+      wickUpColor: '#10b981',
+    })
+  }
 
   // 添加鼠标悬停事件
   chart.subscribeCrosshairMove((param) => {
-    if (!param.point || !param.time || !candlestickSeries) {
-      tooltipData.value = null
-      return
-    }
-
-    const data = param.seriesData.get(candlestickSeries) as any
-    if (!data) {
+    if (!param.point || !param.time) {
       tooltipData.value = null
       return
     }
@@ -235,18 +251,44 @@ const initChart = async () => {
     const containerRect = chartContainer.value?.getBoundingClientRect()
     if (!containerRect) return
 
+    let data: any = null
+    let displayData: any = {}
+
+    if (timeframe.value === '1m' && lineSeries) {
+      data = param.seriesData.get(lineSeries) as any
+      if (data) {
+        displayData = {
+          close: data.value.toFixed(2) // 线条图只需要当前价
+        }
+      }
+    } else if (candlestickSeries) {
+      data = param.seriesData.get(candlestickSeries) as any
+      if (data) {
+        displayData = {
+          open: data.open.toFixed(2),
+          high: data.high.toFixed(2),
+          low: data.low.toFixed(2),
+          close: data.close.toFixed(2)
+        }
+      }
+    }
+
+    if (!data) {
+      tooltipData.value = null
+      return
+    }
+
     tooltipData.value = {
       x: Math.min(param.point.x + 10, containerRect.width - 200),
       y: Math.max(param.point.y - 100, 10),
       date: new Date(param.time as number * 1000).toLocaleDateString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
-        day: '2-digit'
+        day: '2-digit',
+        hour: timeframe.value === '1m' ? '2-digit' : undefined,
+        minute: timeframe.value === '1m' ? '2-digit' : undefined
       }),
-      open: data.open.toFixed(2),
-      high: data.high.toFixed(2),
-      low: data.low.toFixed(2),
-      close: data.close.toFixed(2)
+      ...displayData
     }
   })
 
@@ -272,6 +314,7 @@ const initChart = async () => {
       chart.remove()
       chart = null
       candlestickSeries = null
+      lineSeries = null
     }
   }
 }
@@ -340,21 +383,46 @@ const fillMissingDates = (data: CandlestickData[]): LightweightCandlestickData[]
 const loadData = async () => {
   try {
     chartLoading.value = true
-    const data = await fetchHistoricalData(props.metal, 30)
+    let data: CandlestickData[] = []
+
+    // 根据时间周期选择不同的数据源
+    if (timeframe.value === '1m') {
+      // 1分钟使用分时数据
+      data = await fetchMinuteKlineData(props.metal)
+    } else {
+      // 其他周期使用历史数据
+      data = await fetchHistoricalData(props.metal, 30)
+    }
 
     if (data.length === 0) {
-      console.warn('历史数据不可用')
+      console.warn('数据不可用')
       hasData.value = false
       return
     }
 
-    // 填充缺失日期的数据
-    const chartData = fillMissingDates(data)
+    let chartData: LightweightCandlestickData[] = []
 
-    if (candlestickSeries && chart) {
-      candlestickSeries.setData(chartData)
-      chart.timeScale().fitContent()
-      hasData.value = true
+    if (timeframe.value === '1m') {
+      // 1分钟数据转换为线条图格式
+      const lineData = data.map((item: CandlestickData) => ({
+        time: item.time as Time,
+        value: item.close, // 使用收盘价作为线条图的值
+      }))
+
+      if (lineSeries && chart) {
+        lineSeries.setData(lineData)
+        chart.timeScale().fitContent()
+        hasData.value = true
+      }
+    } else {
+      // 其他周期填充缺失日期并使用蜡烛图
+      chartData = fillMissingDates(data)
+
+      if (candlestickSeries && chart) {
+        candlestickSeries.setData(chartData)
+        chart.timeScale().fitContent()
+        hasData.value = true
+      }
     }
   } catch (error) {
     console.error('加载图表数据失败:', error)
@@ -365,32 +433,8 @@ const loadData = async () => {
 }
 
 const refreshChart = async () => {
-  if (!candlestickSeries) return
-
-  try {
-    chartLoading.value = true
-    const data = await fetchHistoricalData(props.metal, 30)
-
-    if (data.length === 0) {
-      console.warn('历史数据不可用')
-      hasData.value = false
-      return
-    }
-
-    // 填充缺失日期的数据
-    const chartData = fillMissingDates(data)
-
-    candlestickSeries.setData(chartData)
-    if (chart) {
-      chart.timeScale().fitContent()
-    }
-    hasData.value = true
-  } catch (error) {
-    console.error('刷新图表数据失败:', error)
-    hasData.value = false
-  } finally {
-    chartLoading.value = false
-  }
+  if (!candlestickSeries && !lineSeries) return
+  await loadData() // 复用loadData的逻辑
 }
 
 watch(() => props.metal, async () => {
@@ -399,6 +443,20 @@ watch(() => props.metal, async () => {
     chart.remove()
     chart = null
     candlestickSeries = null
+    lineSeries = null
+  }
+  await nextTick()
+  await initChart()
+})
+
+// 监听时间周期变化 - 需要重新创建图表来切换图表类型
+watch(() => timeframe.value, async () => {
+  tooltipData.value = null
+  if (chart) {
+    chart.remove()
+    chart = null
+    candlestickSeries = null
+    lineSeries = null
   }
   await nextTick()
   await initChart()

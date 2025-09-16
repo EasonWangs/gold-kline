@@ -67,6 +67,7 @@ const fetchRealMetalPrice = async (metal: MetalType = 'gold'): Promise<{ price: 
     console.log(`AKTools - ${metalName}CNY价格: ${price.toFixed(2)}`);
     console.log(`${metalName}当日高低价: 最高=${high.toFixed(2)}, 最低=${low.toFixed(2)}, 涨跌=${change.toFixed(2)}, 涨跌幅=${changePercent.toFixed(2)}%`);
     console.log(`${metalName}API原始数据字段:`, Object.keys(latestData));
+    console.log(`${metalName}分时数据总条数:`, data.length);
 
     return { price, high, low, change, changePercent };
   } catch (error) {
@@ -137,7 +138,105 @@ const fetchHistoricalData = async (metal: MetalType = 'gold', days: number = 30)
   }
 };
 
-export { getMetalName };
+// 获取1分钟K线数据（基于实时分时数据）
+const fetchMinuteKlineData = async (metal: MetalType = 'gold'): Promise<CandlestickData[]> => {
+  try {
+    const metalName = getMetalName(metal);
+    const symbol = METAL_SYMBOLS[metal];
+    console.log(`📈 开始获取${metalName}1分钟K线数据...`);
+
+    const response = await axios.get(`${AKTOOLS_BASE_URL}/spot_quotations_sge`, {
+      params: { symbol },
+      timeout: 10000
+    });
+
+    const data = response.data;
+
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('Invalid minute data response');
+    }
+
+    console.log(`${metalName}分时数据总条数:`, data.length);
+    console.log(`${metalName}分时数据示例:`, data.slice(0, 2));
+
+    // 将分时数据转换为1分钟K线格式
+    const results: CandlestickData[] = [];
+    const minuteGroups = new Map<string, any[]>();
+
+    // 按分钟分组
+    data.forEach((item: any) => {
+      if (!item.时间 || !item.现价) return;
+
+      // 解析时间
+      const timeStr = item.时间.toString();
+      let timestamp: number;
+
+      if (timeStr.includes(':')) {
+        // 如果只有时间，添加今天的日期
+        const today = new Date();
+        const timeParts = timeStr.split(':');
+        const hours = parseInt(timeParts[0]);
+        const minutes = parseInt(timeParts[1]);
+        const seconds = timeParts[2] ? parseInt(timeParts[2]) : 0;
+
+        const fullTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(),
+          hours, minutes, seconds);
+        timestamp = Math.floor(fullTime.getTime() / 1000);
+      } else {
+        // 如果是完整的时间戳
+        timestamp = parseInt(item.时间);
+      }
+
+      // 按分钟分组（去掉秒数）
+      const minuteTimestamp = Math.floor(timestamp / 60) * 60;
+      const minuteKey = minuteTimestamp.toString();
+
+      if (!minuteGroups.has(minuteKey)) {
+        minuteGroups.set(minuteKey, []);
+      }
+      minuteGroups.get(minuteKey)!.push({
+        ...item,
+        timestamp: minuteTimestamp
+      });
+    });
+
+    // 将每分钟的数据转换为OHLC格式
+    for (const [minuteKey, minuteData] of minuteGroups.entries()) {
+      if (minuteData.length === 0) continue;
+
+      // 按时间排序
+      minuteData.sort((a, b) => a.timestamp - b.timestamp);
+
+      const prices = minuteData.map(d => parseFloat(d.现价));
+      const open = prices[0];
+      const close = prices[prices.length - 1];
+      const high = Math.max(...prices);
+      const low = Math.min(...prices);
+
+      results.push({
+        time: parseInt(minuteKey),
+        open: Number(open.toFixed(2)),
+        high: Number(high.toFixed(2)),
+        low: Number(low.toFixed(2)),
+        close: Number(close.toFixed(2)),
+        volume: minuteData.length // 用数据点数量作为成交量指标
+      });
+    }
+
+    // 按时间排序
+    results.sort((a, b) => a.time - b.time);
+
+    console.log(`✅ 成功生成${results.length}条${metalName}1分钟K线数据`);
+    return results;
+
+  } catch (error) {
+    const metalName = getMetalName(metal);
+    console.error(`${metalName}1分钟K线数据获取失败:`, error);
+    return [];
+  }
+};
+
+export { getMetalName, fetchMinuteKlineData };
 
 export const fetchMetalPrice = async (metal: MetalType = 'gold'): Promise<MetalPrice | null> => {
   try {
