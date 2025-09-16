@@ -67,7 +67,7 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const currentMetal = ref<MetalType>('gold')
 
-let intervalId: number | null = null
+let intervalId: NodeJS.Timeout | null = null
 
 const loadMetalPrice = async () => {
   try {

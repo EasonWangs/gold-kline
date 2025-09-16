@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { GoldPrice, MetalPrice, MetalType, CandlestickData } from '../types/gold';
+import { MetalPrice, MetalType, CandlestickData } from '../types/gold';
 
 // AKTools本地服务配置
 const AKTOOLS_BASE_URL = '/api/public';
@@ -10,8 +10,6 @@ const METAL_SYMBOLS = {
   silver: 'Ag99.99'   // 上海黄金交易所 Ag99.99
 };
 
-// 转换常量
-const GRAM_TO_OUNCE = 31.1035; // 1盎司 = 31.1035克
 
 // 获取实时贵金属价格（仅支持人民币/克）
 const fetchRealMetalPrice = async (metal: MetalType = 'gold'): Promise<{ price: number; high: number; low: number; change: number; changePercent: number }> => {
@@ -150,22 +148,4 @@ export const fetchMetalPrice = async (metal: MetalType = 'gold'): Promise<MetalP
   }
 };
 
-// 保持向后兼容性
-export const fetchGoldPrice = async (): Promise<GoldPrice | null> => {
-  const result = await fetchMetalPrice('gold');
-  if (!result) return null;
-
-  const { metal, ...goldPrice } = result;
-  return goldPrice;
-};
-
 export { fetchHistoricalData };
-
-export const fetchRealTimeUpdates = async (metal: MetalType = 'gold'): Promise<MetalPrice | null> => {
-  return fetchMetalPrice(metal);
-};
-
-// 保持向后兼容性
-export const fetchGoldRealTimeUpdates = async (): Promise<GoldPrice | null> => {
-  return fetchGoldPrice();
-};

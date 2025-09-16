@@ -107,7 +107,7 @@ import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { createChart, type IChartApi, type ISeriesApi, type CandlestickData as LightweightCandlestickData, type Time } from 'lightweight-charts'
 import { fetchHistoricalData } from '../services/metalApi'
 import type { CandlestickData, MetalType } from '../types/gold'
-import { RefreshCw, TrendingUp, AlertCircle, Coins, Gem } from 'lucide-vue-next'
+import { RefreshCw, AlertCircle, Coins, Gem } from 'lucide-vue-next'
 
 const props = defineProps<{
   loading: boolean
