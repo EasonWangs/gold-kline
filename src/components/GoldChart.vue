@@ -72,6 +72,33 @@
         </div>
       </div>
 
+      <!-- 悬停提示框 -->
+      <div
+        v-if="tooltipData && hasData"
+        class="absolute pointer-events-none z-20 bg-slate-800/95 backdrop-blur-sm border border-slate-600 rounded-lg p-3 text-sm text-white shadow-lg"
+        :style="{ left: tooltipData.x + 'px', top: tooltipData.y + 'px' }"
+      >
+        <div class="font-medium mb-2">{{ tooltipData.date }}</div>
+        <div class="space-y-1">
+          <div class="flex justify-between space-x-4">
+            <span class="text-slate-400">开盘:</span>
+            <span>{{ currencyInfo.symbol }}{{ tooltipData.open }}</span>
+          </div>
+          <div class="flex justify-between space-x-4">
+            <span class="text-green-400">最高:</span>
+            <span class="text-green-400">{{ currencyInfo.symbol }}{{ tooltipData.high }}</span>
+          </div>
+          <div class="flex justify-between space-x-4">
+            <span class="text-red-400">最低:</span>
+            <span class="text-red-400">{{ currencyInfo.symbol }}{{ tooltipData.low }}</span>
+          </div>
+          <div class="flex justify-between space-x-4">
+            <span class="text-slate-400">收盘:</span>
+            <span>{{ currencyInfo.symbol }}{{ tooltipData.close }}</span>
+          </div>
+        </div>
+      </div>
+
       <div
         ref="chartContainer"
         class="w-full h-[500px] bg-slate-900/30 rounded-lg"
@@ -105,7 +132,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { createChart, type IChartApi, type ISeriesApi, type CandlestickData as LightweightCandlestickData, type Time } from 'lightweight-charts'
-import { fetchHistoricalData } from '../services/metalApi'
+import { fetchHistoricalData, getMetalName } from '../services/metalApi'
 import type { CandlestickData, MetalType } from '../types/gold'
 import { RefreshCw, AlertCircle, Coins, Gem } from 'lucide-vue-next'
 
@@ -118,6 +145,15 @@ const chartContainer = ref<HTMLDivElement>()
 const chartLoading = ref(true)
 const hasData = ref(false)
 const timeframe = ref('1D')
+const tooltipData = ref<{
+  x: number
+  y: number
+  date: string
+  open: string
+  high: string
+  low: string
+  close: string
+} | null>(null)
 
 let chart: IChartApi | null = null
 let candlestickSeries: ISeriesApi<'Candlestick'> | null = null
@@ -131,13 +167,13 @@ const timeframes = [
   { label: '1周', value: '1W' },
 ]
 
-const currencyInfo = {
+const currencyInfo = computed(() => ({
   symbol: '¥',
-  unit: '人民币/克'
-}
+  unit: props.metal === 'gold' ? '人民币/克' : '人民币/千克'
+}))
 
 const MetalIcon = computed(() => props.metal === 'gold' ? Coins : Gem)
-const metalName = computed(() => props.metal === 'gold' ? '黄金' : '白银')
+const metalName = computed(() => getMetalName(props.metal))
 const metalColor = computed(() => props.metal === 'gold' ? 'text-yellow-400' : 'text-gray-300')
 
 const initChart = async () => {
@@ -165,6 +201,11 @@ const initChart = async () => {
       borderColor: '#4b5563',
       timeVisible: true,
       secondsVisible: false,
+      barSpacing: 8,
+      rightOffset: 12,
+      fixLeftEdge: false,
+      fixRightEdge: false,
+      lockVisibleTimeRangeOnResize: true,
     },
   })
 
@@ -176,6 +217,37 @@ const initChart = async () => {
     borderUpColor: '#10b981',
     wickDownColor: '#ef4444',
     wickUpColor: '#10b981',
+  })
+
+  // 添加鼠标悬停事件
+  chart.subscribeCrosshairMove((param) => {
+    if (!param.point || !param.time || !candlestickSeries) {
+      tooltipData.value = null
+      return
+    }
+
+    const data = param.seriesData.get(candlestickSeries) as any
+    if (!data) {
+      tooltipData.value = null
+      return
+    }
+
+    const containerRect = chartContainer.value?.getBoundingClientRect()
+    if (!containerRect) return
+
+    tooltipData.value = {
+      x: Math.min(param.point.x + 10, containerRect.width - 200),
+      y: Math.max(param.point.y - 100, 10),
+      date: new Date(param.time as number * 1000).toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }),
+      open: data.open.toFixed(2),
+      high: data.high.toFixed(2),
+      low: data.low.toFixed(2),
+      close: data.close.toFixed(2)
+    }
   })
 
   // 加载历史数据
@@ -195,12 +267,74 @@ const initChart = async () => {
   // 清理函数
   return () => {
     window.removeEventListener('resize', handleResize)
+    tooltipData.value = null
     if (chart) {
       chart.remove()
       chart = null
       candlestickSeries = null
     }
   }
+}
+
+const fillMissingDates = (data: CandlestickData[]): LightweightCandlestickData[] => {
+  if (data.length === 0) return []
+
+  // 先过滤掉未来日期的数据
+  const today = Math.floor(Date.now() / 1000 / 86400) * 86400
+  const filteredData = data.filter(item => {
+    const dayTimestamp = Math.floor(item.time / 86400) * 86400
+    return dayTimestamp <= today
+  })
+
+  if (filteredData.length === 0) return []
+
+  const sortedData = [...filteredData].sort((a, b) => a.time - b.time)
+  const result: LightweightCandlestickData[] = []
+
+  const startTime = sortedData[0].time
+  const endTime = sortedData[sortedData.length - 1].time
+
+  // 创建数据映射以便快速查找
+  const dataMap = new Map<number, CandlestickData>()
+  sortedData.forEach(item => {
+    const dayTimestamp = Math.floor(item.time / 86400) * 86400
+    dataMap.set(dayTimestamp, item)
+  })
+
+  // 生成连续的日期序列，从开始到结束（都不超过今天）
+  let currentTime = Math.floor(startTime / 86400) * 86400
+  const endDayTime = Math.floor(endTime / 86400) * 86400
+
+  while (currentTime <= endDayTime) {
+    const existingData = dataMap.get(currentTime)
+
+    if (existingData) {
+      // 有交易数据
+      result.push({
+        time: existingData.time as Time,
+        open: existingData.open,
+        high: existingData.high,
+        low: existingData.low,
+        close: existingData.close,
+      })
+    } else {
+      // 无交易数据，使用前一个交易日的收盘价
+      const prevData = result[result.length - 1]
+      if (prevData) {
+        result.push({
+          time: currentTime as Time,
+          open: prevData.close,
+          high: prevData.close,
+          low: prevData.close,
+          close: prevData.close,
+        })
+      }
+    }
+
+    currentTime += 86400 // 下一天
+  }
+
+  return result
 }
 
 const loadData = async () => {
@@ -214,14 +348,8 @@ const loadData = async () => {
       return
     }
 
-    // 转换数据格式
-    const chartData: LightweightCandlestickData[] = data.map((item: CandlestickData) => ({
-      time: item.time as Time,
-      open: item.open,
-      high: item.high,
-      low: item.low,
-      close: item.close,
-    }))
+    // 填充缺失日期的数据
+    const chartData = fillMissingDates(data)
 
     if (candlestickSeries && chart) {
       candlestickSeries.setData(chartData)
@@ -249,13 +377,8 @@ const refreshChart = async () => {
       return
     }
 
-    const chartData: LightweightCandlestickData[] = data.map((item: CandlestickData) => ({
-      time: item.time as Time,
-      open: item.open,
-      high: item.high,
-      low: item.low,
-      close: item.close,
-    }))
+    // 填充缺失日期的数据
+    const chartData = fillMissingDates(data)
 
     candlestickSeries.setData(chartData)
     if (chart) {
@@ -271,6 +394,7 @@ const refreshChart = async () => {
 }
 
 watch(() => props.metal, async () => {
+  tooltipData.value = null
   if (chart) {
     chart.remove()
     chart = null

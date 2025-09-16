@@ -37,7 +37,11 @@
                   ? '人民币价格来自上海金交所Au99.99数据，通过AKTools本地服务获取。'
                   : '人民币价格来自上海金交所Ag99.99数据，通过AKTools本地服务获取。'
               }}
-              显示单位为人民币/克，符合国内贵金属交易习惯。
+              {{
+                currentMetal === 'gold'
+                  ? '显示单位为人民币/克，符合国内贵金属交易习惯。'
+                  : '显示单位为人民币/千克，符合上海金交所Ag99.99合约标准。'
+              }}
             </p>
           </div>
         </div>
@@ -46,7 +50,7 @@
       <!-- 数据来源说明 -->
       <div class="mt-6 text-center text-xs text-slate-500">
         <p>
-          数据来源：上海金交所 {{ currentMetal === 'gold' ? 'Au99.99' : 'Ag99.99' }} | AKTools本地服务 | 更新频率：30秒 | 人民币/克
+          数据来源：上海金交所 {{ currentMetal === 'gold' ? 'Au99.99' : 'Ag99.99' }} | AKTools本地服务 | 更新频率：30秒 | {{ currentMetal === 'gold' ? '人民币/克' : '人民币/千克' }}
         </p>
       </div>
     </div>
@@ -59,7 +63,7 @@ import Header from './components/Header.vue'
 import GoldChart from './components/GoldChart.vue'
 import PriceInfo from './components/PriceInfo.vue'
 import MetalSwitch from './components/MetalSwitch.vue'
-import { fetchMetalPrice } from './services/metalApi'
+import { fetchMetalPrice, getMetalName } from './services/metalApi'
 import type { MetalPrice, MetalType } from './types/gold'
 
 const metalPrice = ref<MetalPrice | null>(null)
@@ -76,7 +80,7 @@ const loadMetalPrice = async () => {
     metalPrice.value = price
     error.value = null
   } catch (err) {
-    const metalName = currentMetal.value === 'gold' ? '黄金' : '白银'
+    const metalName = getMetalName(currentMetal.value)
     error.value = `获取${metalName}价格失败`
     console.error(`Error fetching ${currentMetal.value} price:`, err)
   } finally {

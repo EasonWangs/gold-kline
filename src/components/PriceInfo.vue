@@ -130,6 +130,7 @@
 import { computed } from 'vue'
 import { TrendingUp, TrendingDown, Clock, WifiOff, Database, Coins, Gem } from 'lucide-vue-next'
 import type { MetalPrice, MetalType } from '../types/gold'
+import { getMetalName } from '../services/metalApi'
 import dayjs from 'dayjs'
 
 const props = defineProps<{
@@ -138,17 +139,17 @@ const props = defineProps<{
   metal: MetalType
 }>()
 
-const currencyInfo = {
+const currencyInfo = computed(() => ({
   symbol: '¥',
-  unit: '人民币/克',
+  unit: props.metal === 'gold' ? '人民币/克' : '人民币/千克',
   formatPrice: (price: number) => `¥${price.toFixed(2)}`
-}
+}))
 
 const isPositive = computed(() => (props.metalPrice?.change ?? 0) >= 0)
 const TrendIcon = computed(() => isPositive.value ? TrendingUp : TrendingDown)
 const trendColor = computed(() => isPositive.value ? 'text-green-400' : 'text-red-400')
 const bgColor = computed(() => isPositive.value ? 'bg-green-500/20' : 'bg-red-500/20')
 const MetalIcon = computed(() => props.metal === 'gold' ? Coins : Gem)
-const metalName = computed(() => props.metal === 'gold' ? '黄金' : '白银')
+const metalName = computed(() => getMetalName(props.metal))
 const metalColor = computed(() => props.metal === 'gold' ? 'text-yellow-400' : 'text-gray-300')
 </script>

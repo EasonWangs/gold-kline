@@ -10,8 +10,14 @@ const METAL_SYMBOLS = {
   silver: 'Ag99.99'   // 上海黄金交易所 Ag99.99
 };
 
+// 获取金属中文名称
+const getMetalName = (metal: MetalType): string => {
+  return metal === 'gold' ? '黄金' : '白银';
+};
 
-// 获取实时贵金属价格（仅支持人民币/克）
+
+
+// 获取实时贵金属价格（黄金：人民币/克，白银：人民币/千克）
 const fetchRealMetalPrice = async (metal: MetalType = 'gold'): Promise<{ price: number; high: number; low: number; change: number; changePercent: number }> => {
   try {
     const symbol = METAL_SYMBOLS[metal];
@@ -33,25 +39,38 @@ const fetchRealMetalPrice = async (metal: MetalType = 'gold'): Promise<{ price: 
       throw new Error('No valid price data');
     }
 
-    // AKTools返回的是人民币/克价格
+    // AKTools返回的价格数据
     let price = parseFloat(latestData.现价);
 
-    // 白银数据单位修正：千克价格转换为克价格
-    if (metal === 'silver' && price > 1000) {
-      price = price / 1000;
-    }
-
-    let high = price * 1.01; // 估算当日高点
-    let low = price * 0.99;  // 估算当日低点
-    let change = 0; // AKTools API不提供变化数据
+    // 尝试获取真实的高低价数据
+    let high = price;
+    let low = price;
+    let change = 0;
     let changePercent = 0;
 
-    const metalName = metal === 'gold' ? '黄金' : '白银';
-    console.log(`AKTools - ${metalName}CNY价格: ${price.toFixed(2)} CNY/克`);
+    // 检查API是否提供高低价数据
+    if (latestData.最高 && latestData.最低) {
+      high = parseFloat(latestData.最高);
+      low = parseFloat(latestData.最低);
+    }
+
+    // 检查API是否提供涨跌数据
+    if (latestData.涨跌 !== undefined) {
+      change = parseFloat(latestData.涨跌) || 0;
+    }
+
+    if (latestData.涨跌幅 !== undefined) {
+      changePercent = parseFloat(latestData.涨跌幅) || 0;
+    }
+
+    const metalName = getMetalName(metal);
+    console.log(`AKTools - ${metalName}CNY价格: ${price.toFixed(2)}`);
+    console.log(`${metalName}当日高低价: 最高=${high.toFixed(2)}, 最低=${low.toFixed(2)}, 涨跌=${change.toFixed(2)}, 涨跌幅=${changePercent.toFixed(2)}%`);
+    console.log(`${metalName}API原始数据字段:`, Object.keys(latestData));
 
     return { price, high, low, change, changePercent };
   } catch (error) {
-    const metalName = metal === 'gold' ? '黄金' : '白银';
+    const metalName = getMetalName(metal);
     console.error(`AKTools${metalName}实时数据获取失败:`, error);
     throw error;
   }
@@ -60,14 +79,17 @@ const fetchRealMetalPrice = async (metal: MetalType = 'gold'): Promise<{ price: 
 // 获取历史数据
 const fetchHistoricalData = async (metal: MetalType = 'gold', days: number = 30): Promise<CandlestickData[]> => {
   try {
-    const metalName = metal === 'gold' ? '黄金' : '白银';
-    console.log(`开始获取${days}天的${metalName}CNY历史数据...`);
-
+    const metalName = getMetalName(metal);
     const symbol = METAL_SYMBOLS[metal];
+    console.log(`🔍 开始获取${days}天的${metalName}CNY历史数据...`);
+    console.log(`📡 请求URL: ${AKTOOLS_BASE_URL}/spot_hist_sge?symbol=${symbol}`);
+
     const response = await axios.get(`${AKTOOLS_BASE_URL}/spot_hist_sge`, {
       params: { symbol },
       timeout: 15000
     });
+
+    console.log(`✅ ${metalName}历史数据请求成功，状态码:`, response.status);
 
     const data = response.data;
 
@@ -92,14 +114,6 @@ const fetchHistoricalData = async (metal: MetalType = 'gold', days: number = 30)
       let low = parseFloat(item.low);
       let close = parseFloat(item.close);
 
-      // 白银数据单位修正：千克价格转换为克价格
-      if (metal === 'silver') {
-        if (open > 1000) open = open / 1000;
-        if (high > 1000) high = high / 1000;
-        if (low > 1000) low = low / 1000;
-        if (close > 1000) close = close / 1000;
-      }
-
       results.push({
         time: timestamp,
         open: Number(open.toFixed(2)),
@@ -117,16 +131,18 @@ const fetchHistoricalData = async (metal: MetalType = 'gold', days: number = 30)
     return results;
 
   } catch (error) {
-    const metalName = metal === 'gold' ? '黄金' : '白银';
+    const metalName = getMetalName(metal);
     console.error(`AKTools${metalName}历史数据获取失败:`, error);
     return []; // 返回空数组表示数据不可用
   }
 };
 
+export { getMetalName };
+
 export const fetchMetalPrice = async (metal: MetalType = 'gold'): Promise<MetalPrice | null> => {
   try {
     const metalData = await fetchRealMetalPrice(metal);
-    const metalName = metal === 'gold' ? '黄金' : '白银';
+    const metalName = getMetalName(metal);
 
     console.log(`CNY${metalName}价格:`, metalData);
 
@@ -142,7 +158,7 @@ export const fetchMetalPrice = async (metal: MetalType = 'gold'): Promise<MetalP
       metal
     };
   } catch (error) {
-    const metalName = metal === 'gold' ? '黄金' : '白银';
+    const metalName = getMetalName(metal);
     console.error(`获取CNY${metalName}价格失败:`, error);
     return null; // 返回null表示数据不可用
   }
