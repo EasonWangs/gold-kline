@@ -1,15 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createChart, IChartApi, ISeriesApi, CandlestickData as LightweightCandlestickData, Time } from 'lightweight-charts';
 import { fetchHistoricalData } from '../services/goldApi';
-import { CandlestickData } from '../types/gold';
-import { RefreshCw, TrendingUp, AlertCircle } from 'lucide-react';
+import { CandlestickData, MetalType } from '../types/gold';
+import { RefreshCw, TrendingUp, AlertCircle, Coins, Gem } from 'lucide-react';
 
 interface GoldChartProps {
   loading: boolean;
-  currency: 'USD' | 'CNY';
+  metal: MetalType;
 }
 
-const GoldChart: React.FC<GoldChartProps> = ({ loading, currency }) => {
+const GoldChart: React.FC<GoldChartProps> = ({ loading, metal }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -63,7 +63,7 @@ const GoldChart: React.FC<GoldChartProps> = ({ loading, currency }) => {
     const loadData = async () => {
       try {
         setChartLoading(true);
-        const data = await fetchHistoricalData(30, currency);
+        const data = await fetchHistoricalData(metal, 30);
         
         if (data.length === 0) {
           console.warn('历史数据不可用');
@@ -110,14 +110,14 @@ const GoldChart: React.FC<GoldChartProps> = ({ loading, currency }) => {
         chart.remove();
       }
     };
-  }, [currency]);
+  }, [metal]);
 
   const refreshChart = async () => {
     if (!candlestickSeriesRef.current) return;
     
     try {
       setChartLoading(true);
-      const data = await fetchHistoricalData(30, currency);
+      const data = await fetchHistoricalData(30);
       
       if (data.length === 0) {
         console.warn('历史数据不可用');
@@ -156,19 +156,23 @@ const GoldChart: React.FC<GoldChartProps> = ({ loading, currency }) => {
   ];
 
   const currencyInfo = {
-    USD: { symbol: '$', unit: '美元/盎司' },
-    CNY: { symbol: '¥', unit: '人民币/克' }
+    symbol: '¥',
+    unit: '人民币/克'
   };
+
+  const MetalIcon = metal === 'gold' ? Coins : Gem;
+  const metalName = metal === 'gold' ? '黄金' : '白银';
+  const metalColor = metal === 'gold' ? 'text-yellow-400' : 'text-gray-300';
 
   return (
     <div className="chart-container p-6">
       {/* 图表头部 */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-3">
-          <TrendingUp className="w-6 h-6 text-gold-400" />
+          <MetalIcon className={`w-6 h-6 ${metalColor}`} />
           <div>
-            <h2 className="text-xl font-semibold text-white">黄金价格走势</h2>
-            <p className="text-sm text-slate-400">{currencyInfo[currency].unit}</p>
+            <h2 className="text-xl font-semibold text-white">{metalName}价格走势</h2>
+            <p className="text-sm text-slate-400">{currencyInfo.unit}</p>
           </div>
         </div>
         
@@ -181,7 +185,7 @@ const GoldChart: React.FC<GoldChartProps> = ({ loading, currency }) => {
                 onClick={() => setTimeframe(tf.value)}
                 className={`px-3 py-1 text-sm rounded transition-colors ${
                   timeframe === tf.value
-                    ? 'bg-gold-500 text-white'
+                    ? (metal === 'gold' ? 'bg-yellow-500 text-white' : 'bg-gray-400 text-white')
                     : 'text-slate-400 hover:text-white hover:bg-slate-700'
                 }`}
               >
@@ -217,18 +221,18 @@ const GoldChart: React.FC<GoldChartProps> = ({ loading, currency }) => {
           <div className="absolute inset-0 flex items-center justify-center z-10 rounded-lg">
             <div className="text-center">
               <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-white mb-2">历史数据暂不可用</h3>
+              <h3 className="text-lg font-medium text-white mb-2">{metalName}历史数据暂不可用</h3>
               <p className="text-slate-400 text-sm mb-4 max-w-md">
                 可能原因：API配额限制、网络问题或周末/节假日无交易数据
               </p>
               <p className="text-slate-500 text-xs mb-4">
-                请查看上方的实时价格信息获取当前黄金价格
+                请查看上方的实时价格信息获取当前{metalName}价格
               </p>
               <button
                 onClick={refreshChart}
-                className="px-4 py-2 bg-gold-500 hover:bg-gold-600 text-white text-sm rounded-lg transition-colors"
+                className={`px-4 py-2 ${metal === 'gold' ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-gray-400 hover:bg-gray-500'} text-white text-sm rounded-lg transition-colors`}
               >
-                重试加载历史数据
+                重试加载{metalName}历史数据
               </button>
             </div>
           </div>
@@ -255,8 +259,8 @@ const GoldChart: React.FC<GoldChartProps> = ({ loading, currency }) => {
         
         <div className="text-xs">
           {hasData 
-            ? `数据来源: GoldAPI.io 真实历史数据 (${currencyInfo[currency].unit})` 
-            : '当前仅显示实时价格数据 - 历史数据需要API配额支持'
+            ? `数据来源: AKTools ${metalName}真实历史数据 (${currencyInfo.unit})`
+            : `当前仅显示${metalName}实时价格数据 - 历史数据需要API配额支持`
           }
         </div>
       </div>

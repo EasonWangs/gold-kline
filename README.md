@@ -1,17 +1,16 @@
 # 黄金K线图 - 实时监测应用
 
-一个现代化的黄金价格实时监测应用，提供专业的K线图表和价格分析功能。
+一个基于AKTools本地服务的黄金价格实时监测应用，使用上海金交所数据提供专业的K线图表和价格分析功能。
 
 ## 🌟 功能特性
 
-- **实时价格监测**: 每30秒自动更新黄金价格
+- **实时价格监测**: 每30秒自动更新上海金交所Au99.99黄金价格
 - **多货币支持**: 支持美元/盎司和人民币/克双货币切换
 - **专业K线图**: 使用 TradingView 的 lightweight-charts 库
-- **真实历史数据**: 集成多个API数据源，提供真实的历史K线数据
-- **多时间周期**: 支持1分钟到1周的多种时间周期
-- **价格统计**: 显示24小时最高价、最低价、成交量等
+- **真实历史数据**: 基于AKTools本地服务，获取上海金交所历史K线数据
+- **本地数据源**: 使用本地部署的AKTools服务，数据稳定可靠
+- **价格统计**: 显示当日最高价、最低价等价格信息
 - **趋势分析**: 实时显示价格变化和市场趋势
-- **智能备用**: 多API数据源自动切换，确保数据可用性
 - **响应式设计**: 完美适配桌面和移动设备
 - **现代UI**: 使用 Tailwind CSS 打造的美观界面
 
@@ -37,16 +36,8 @@ cd gold-kline
 npm install
 ```
 
-### 3. 配置API密钥（可选）
-创建 `.env` 文件并添加API密钥：
-```bash
-# GoldAPI.io API密钥 (https://goldapi.io/)
-VITE_GOLDAPI_KEY=your_goldapi_key_here
-
-# Alpha Vantage API密钥 (https://www.alphavantage.co/support/#api-key)
-# 免费注册，每天500次请求
-VITE_ALPHAVANTAGE_KEY=your_alphavantage_key_here
-```
+### 3. 确保AKTools服务运行
+确保本地AKTools服务已启动并在 `http://127.0.0.1:8888` 运行
 
 ### 4. 启动开发服务器
 ```bash
@@ -60,29 +51,19 @@ npm run dev
 npm run build
 ```
 
-## 🌐 API 数据源
+## 🌐 数据源
 
-### 主要数据源
-1. **GoldAPI.io** (主要)
-   - 提供实时和历史黄金价格
-   - 支持多货币 (USD, CNY)
-   - 需要API密钥，有免费配额
+### AKTools本地服务
+- **数据源**: 上海金交所 (Shanghai Gold Exchange)
+- **服务地址**: `http://127.0.0.1:8888/api/public`
+- **实时数据**: `spot_quotations_sge` 接口
+- **历史数据**: `spot_hist_sge` 接口
+- **黄金品种**: Au99.99 (上海金交所标准黄金)
 
-2. **Alpha Vantage** (备用历史数据)
-   - 提供外汇市场XAU/USD数据
-   - 免费API，每天500次请求
-   - 需要注册获取API密钥
-
-3. **Coinbase** (备用实时数据)
-   - 免费汇率API，无需密钥
-   - 提供XAU和CNY汇率数据
-   - 用于实时价格备用计算
-
-### 智能切换机制
-- **实时价格**: GoldAPI.io → Coinbase备用
-- **历史数据**: GoldAPI.io → Alpha Vantage备用
-- **自动故障转移**: API配额用完或网络错误时自动切换
-- **错误处理**: 优雅处理API限制和网络问题
+### 汇率转换
+- **美元汇率**: 通过Coinbase免费API获取实时USD/CNY汇率
+- **单位转换**: 自动处理人民币/克 ↔ 美元/盎司转换 (1盎司 = 31.1035克)
+- **备用汇率**: 如汇率API不可用，使用默认汇率7.2
 
 ## 🔧 项目结构
 
@@ -102,19 +83,26 @@ src/
 └── index.css           # 全局样式
 ```
 
-## 🔑 API密钥获取
+## ⚙️ AKTools服务部署
 
-### GoldAPI.io
-1. 访问 [https://goldapi.io/](https://goldapi.io/)
-2. 注册免费账户
-3. 获取API密钥（每月1000次免费请求）
-4. 添加到 `.env` 文件中的 `VITE_GOLDAPI_KEY`
+### 本地服务要求
+1. 确保AKTools服务已在本地部署并运行
+2. 服务应在 `http://127.0.0.1:8888` 端口提供服务
+3. 确保以下接口可访问：
+   - `GET /api/public/spot_quotations_sge?symbol=Au99.99`
+   - `GET /api/public/spot_hist_sge?symbol=Au99.99`
 
-### Alpha Vantage
-1. 访问 [https://www.alphavantage.co/support/#api-key](https://www.alphavantage.co/support/#api-key)
-2. 免费注册（不到20秒）
-3. 获取API密钥（每天500次免费请求）
-4. 添加到 `.env` 文件中的 `VITE_ALPHAVANTAGE_KEY`
+### 服务状态检查
+```bash
+# 检查服务是否运行
+curl http://127.0.0.1:8888
+
+# 测试实时价格接口
+curl "http://127.0.0.1:8888/api/public/spot_quotations_sge?symbol=Au99.99"
+
+# 测试历史数据接口
+curl "http://127.0.0.1:8888/api/public/spot_hist_sge?symbol=Au99.99"
+```
 
 ## 📈 数据格式
 
@@ -172,33 +160,24 @@ interface CandlestickData {
 
 ## 🚀 部署
 
-### 环境变量配置
-生产环境需要配置以下环境变量：
-```bash
-VITE_GOLDAPI_KEY=your_production_goldapi_key
-VITE_ALPHAVANTAGE_KEY=your_production_alphavantage_key
-```
-
-### Vercel 部署
+### 生产环境部署
 ```bash
 npm run build
-# 在Vercel控制台配置环境变量
 ```
 
-### Netlify 部署
-```bash
-npm run build
-# 在Netlify控制台配置环境变量
-```
+### 注意事项
+- 生产环境需要确保AKTools服务可访问
+- 如果部署到服务器，需要修改API地址指向AKTools服务器
+- 可在 `src/services/goldApi.ts` 中配置不同环境的API地址
 
 ## 🔧 配置选项
 
 ### API 配置
 在 `src/services/goldApi.ts` 中可以配置：
-- API 端点和密钥
+- AKTools服务地址
 - 请求超时时间
-- 批量请求大小
-- 错误重试逻辑
+- 汇率API设置
+- 错误处理逻辑
 
 ### 图表配置
 在 `src/components/GoldChart.tsx` 中可以配置：
@@ -209,15 +188,15 @@ npm run build
 
 ## 📝 开发说明
 
-### 添加新的数据源
-1. 在 `goldApi.ts` 中添加新的API函数
-2. 更新错误处理和备用逻辑
-3. 测试API集成和数据格式
+### 修改数据源
+1. 在 `goldApi.ts` 中修改AKTOOLS_BASE_URL
+2. 根据需要调整数据接口和参数
+3. 测试新数据源的集成
 
 ### 自定义货币支持
 1. 更新 `CurrencySwitch.tsx` 组件
-2. 在 `goldApi.ts` 中添加汇率转换逻辑
-3. 更新类型定义
+2. 在 `goldApi.ts` 中添加新的汇率转换逻辑
+3. 更新类型定义以支持新货币
 
 ## 🤝 贡献
 

@@ -11,9 +11,9 @@ const Header: React.FC = () => {
           </div>
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-gold-400 to-gold-600 bg-clip-text text-transparent">
-              黄金K线图
+              贵金属K线图
             </h1>
-            <p className="text-slate-400 text-lg">实时监测黄金走势</p>
+            <p className="text-slate-400 text-lg">实时监测贵金属走势</p>
           </div>
         </div>
       </div>

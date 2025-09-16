@@ -1,4 +1,6 @@
-export interface GoldPrice {
+export type MetalType = 'gold' | 'silver';
+
+export interface MetalPrice {
   price: number;
   currency: string;
   timestamp: number;
@@ -7,7 +9,11 @@ export interface GoldPrice {
   high24h: number;
   low24h: number;
   volume: number;
+  metal: MetalType;
 }
+
+// 保持向后兼容性
+export interface GoldPrice extends Omit<MetalPrice, 'metal'> {}
 
 export interface CandlestickData {
   time: number;
