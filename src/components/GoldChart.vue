@@ -86,6 +86,13 @@
             <span class="text-slate-400">当前价:</span>
             <span class="font-medium">{{ currencyInfo.symbol }}{{ tooltipData.close }}</span>
           </div>
+          <!-- 涨跌百分比 -->
+          <div v-if="tooltipData.changePercent" class="flex justify-between space-x-4">
+            <span class="text-slate-400">涨跌幅:</span>
+            <span :class="tooltipData.changeColor || 'text-slate-400'" class="font-medium">
+              {{ tooltipData.changePercent }}
+            </span>
+          </div>
         </div>
 
         <!-- 其他周期显示完整OHLC -->
@@ -105,6 +112,13 @@
           <div class="flex justify-between space-x-4">
             <span class="text-slate-400">收盘:</span>
             <span>{{ currencyInfo.symbol }}{{ tooltipData.close }}</span>
+          </div>
+          <!-- 涨跌百分比 -->
+          <div v-if="tooltipData.changePercent" class="flex justify-between space-x-4 border-t border-slate-600 pt-1 mt-1">
+            <span class="text-slate-400">涨跌幅:</span>
+            <span :class="tooltipData.changeColor || 'text-slate-400'" class="font-medium">
+              {{ tooltipData.changePercent }}
+            </span>
           </div>
         </div>
       </div>
@@ -163,11 +177,14 @@ const tooltipData = ref<{
   high: string
   low: string
   close: string
+  changePercent?: string
+  changeColor?: string
 } | null>(null)
 
 let chart: IChartApi | null = null
 let candlestickSeries: ISeriesApi<'Candlestick'> | null = null
 let lineSeries: ISeriesApi<'Line'> | null = null
+let chartData: CandlestickData[] = [] // 存储原始K线数据用于计算涨跌百分比
 
 const timeframes = [
   { label: '1分钟', value: '1m' },
@@ -278,6 +295,27 @@ const initChart = async () => {
       return
     }
 
+    // 计算涨跌百分比（以前一日收盘价为基准）
+    let changePercent: string | undefined
+    let changeColor: string | undefined
+
+    if (chartData.length > 0) {
+      // 找到当前数据点在原始数据中的位置
+      const currentTime = param.time as number
+      const currentIndex = chartData.findIndex(item => item.time === currentTime)
+
+      if (currentIndex > 0) {
+        // 获取前一日的收盘价
+        const previousClose = chartData[currentIndex - 1].close
+        const currentClose = timeframe.value === '1m' ? data.value : data.close
+
+        // 计算涨跌百分比
+        const percentChange = ((currentClose - previousClose) / previousClose) * 100
+        changePercent = (percentChange >= 0 ? '+' : '') + percentChange.toFixed(2) + '%'
+        changeColor = percentChange >= 0 ? 'text-green-400' : 'text-red-400'
+      }
+    }
+
     tooltipData.value = {
       x: Math.min(param.point.x + 10, containerRect.width - 200),
       y: Math.max(param.point.y - 100, 10),
@@ -288,6 +326,8 @@ const initChart = async () => {
         hour: timeframe.value === '1m' ? '2-digit' : undefined,
         minute: timeframe.value === '1m' ? '2-digit' : undefined
       }),
+      changePercent,
+      changeColor,
       ...displayData
     }
   })
@@ -397,10 +437,14 @@ const loadData = async () => {
     if (data.length === 0) {
       console.warn('数据不可用')
       hasData.value = false
+      chartData = [] // 清空全局数据
       return
     }
 
-    let chartData: LightweightCandlestickData[] = []
+    // 更新全局chartData用于计算涨跌百分比
+    chartData = data
+
+    let lightweightChartData: LightweightCandlestickData[] = []
 
     if (timeframe.value === '1m') {
       // 1分钟数据转换为线条图格式
@@ -416,10 +460,10 @@ const loadData = async () => {
       }
     } else {
       // 其他周期填充缺失日期并使用蜡烛图
-      chartData = fillMissingDates(data)
+      lightweightChartData = fillMissingDates(data)
 
       if (candlestickSeries && chart) {
-        candlestickSeries.setData(chartData)
+        candlestickSeries.setData(lightweightChartData)
         chart.timeScale().fitContent()
         hasData.value = true
       }
@@ -427,6 +471,7 @@ const loadData = async () => {
   } catch (error) {
     console.error('加载图表数据失败:', error)
     hasData.value = false
+    chartData = [] // 清空全局数据
   } finally {
     chartLoading.value = false
   }

@@ -2,6 +2,7 @@ export type MetalType = 'gold' | 'silver';
 
 export interface MetalPrice {
   price: number;
+  open: number;
   currency: string;
   timestamp: number;
   change: number;

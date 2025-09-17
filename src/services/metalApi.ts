@@ -10,6 +10,67 @@ const METAL_SYMBOLS = {
   silver: 'Ag99.99'   // 上海黄金交易所 Ag99.99
 };
 
+// 历史数据缓存接口
+interface HistoricalDataCache {
+  data: CandlestickData[];
+  timestamp: number;
+  metal: MetalType;
+  days: number;
+}
+
+// 内存缓存存储
+const historicalDataCache = new Map<string, HistoricalDataCache>();
+
+// 缓存键生成函数
+const getCacheKey = (metal: MetalType, days: number): string => {
+  return `${metal}_${days}`;
+};
+
+// 检查缓存是否有效（时间差小于1天）
+const isCacheValid = (cache: HistoricalDataCache): boolean => {
+  const now = Date.now();
+  const oneDay = 24 * 60 * 60 * 1000; // 1天的毫秒数
+  const timeDiff = now - cache.timestamp;
+
+  console.log(`📅 缓存时间检查: 当前时间=${new Date(now).toLocaleString()}, 缓存时间=${new Date(cache.timestamp).toLocaleString()}, 时间差=${Math.round(timeDiff / (60 * 60 * 1000))}小时`);
+
+  return timeDiff < oneDay;
+};
+
+// 获取缓存的历史数据
+const getCachedHistoricalData = (metal: MetalType, days: number): CandlestickData[] | null => {
+  const cacheKey = getCacheKey(metal, days);
+  const cache = historicalDataCache.get(cacheKey);
+
+  if (!cache) {
+    console.log(`💾 ${getMetalName(metal)}历史数据缓存未找到`);
+    return null;
+  }
+
+  if (!isCacheValid(cache)) {
+    console.log(`⏰ ${getMetalName(metal)}历史数据缓存已过期，清除缓存`);
+    historicalDataCache.delete(cacheKey);
+    return null;
+  }
+
+  console.log(`✅ 使用${getMetalName(metal)}历史数据缓存，共${cache.data.length}条数据`);
+  return cache.data;
+};
+
+// 设置历史数据缓存
+const setCachedHistoricalData = (metal: MetalType, days: number, data: CandlestickData[]): void => {
+  const cacheKey = getCacheKey(metal, days);
+  const cache: HistoricalDataCache = {
+    data,
+    timestamp: Date.now(),
+    metal,
+    days
+  };
+
+  historicalDataCache.set(cacheKey, cache);
+  console.log(`💾 ${getMetalName(metal)}历史数据已缓存，共${data.length}条数据`);
+};
+
 // 获取金属中文名称
 const getMetalName = (metal: MetalType): string => {
   return metal === 'gold' ? '黄金' : '白银';
@@ -18,7 +79,7 @@ const getMetalName = (metal: MetalType): string => {
 
 
 // 获取实时贵金属价格（黄金：人民币/克，白银：人民币/千克）
-const fetchRealMetalPrice = async (metal: MetalType = 'gold'): Promise<{ price: number; high: number; low: number; change: number; changePercent: number }> => {
+const fetchRealMetalPrice = async (metal: MetalType = 'gold', previousClose?: number): Promise<{ price: number; open: number; high: number; low: number; change: number; changePercent: number }> => {
   try {
     const symbol = METAL_SYMBOLS[metal];
     const response = await axios.get(`${AKTOOLS_BASE_URL}/spot_quotations_sge`, {
@@ -42,34 +103,81 @@ const fetchRealMetalPrice = async (metal: MetalType = 'gold'): Promise<{ price: 
     // AKTools返回的价格数据
     let price = parseFloat(latestData.现价);
 
-    // 尝试获取真实的高低价数据
+    // 尝试获取真实的OHLC数据
+    let open = price; // 默认使用当前价
     let high = price;
     let low = price;
     let change = 0;
     let changePercent = 0;
 
-    // 检查API是否提供高低价数据
-    if (latestData.最高 && latestData.最低) {
-      high = parseFloat(latestData.最高);
-      low = parseFloat(latestData.最低);
+    // 从分时数据中查找9:00:00的开盘价
+    const openingData = data.find(item => {
+      const timeStr = item.时间?.toString() || '';
+      return timeStr.includes('9:00:00') || timeStr.includes('09:00:00');
+    });
+
+    if (openingData && openingData.现价) {
+      open = parseFloat(openingData.现价);
+      console.log(`找到开盘价数据: 时间=${openingData.时间}, 价格=${open.toFixed(2)}`);
+    } else {
+      // 检查API是否在latestData中提供开盘价数据
+      if (latestData.开盘 !== undefined && latestData.开盘 !== null) {
+        open = parseFloat(latestData.开盘);
+      }
     }
 
-    // 检查API是否提供涨跌数据
-    if (latestData.涨跌 !== undefined) {
-      change = parseFloat(latestData.涨跌) || 0;
+    // 从分时数据数组中计算今日真实的最高价和最低价
+    const prices = data
+      .filter(item => item.现价 && !isNaN(parseFloat(item.现价)))
+      .map(item => parseFloat(item.现价));
+
+    if (prices.length > 0) {
+      high = Math.max(...prices);
+      low = Math.min(...prices);
+      console.log(`从${prices.length}条分时数据中计算: 最高=${high.toFixed(2)}, 最低=${low.toFixed(2)}`);
+    } else {
+      // 备用方案：检查API是否在latestData中提供高低价数据
+      if (latestData.最高 && latestData.最低) {
+        high = parseFloat(latestData.最高);
+        low = parseFloat(latestData.最低);
+        console.log(`使用API提供的高低价: 最高=${high.toFixed(2)}, 最低=${low.toFixed(2)}`);
+      }
     }
 
-    if (latestData.涨跌幅 !== undefined) {
-      changePercent = parseFloat(latestData.涨跌幅) || 0;
+    // 使用传入的前一日收盘价作为基准价格
+    let basePrice = previousClose || open; // 如果没有传入前一日收盘价，默认使用开盘价作为备用
+
+    if (previousClose) {
+      console.log(`使用传入的前一日收盘价: ${previousClose.toFixed(2)}`);
+    } else {
+      console.log(`未传入前一日收盘价，使用开盘价作为基准: ${basePrice.toFixed(2)}`);
+    }
+
+    // 基于当前价和基准价格计算涨跌额和涨跌幅
+    change = price - basePrice;
+    changePercent = basePrice !== 0 ? (change / basePrice) * 100 : 0;
+
+    console.log(`涨跌计算: 当前价=${price.toFixed(2)}, 基准价=${basePrice.toFixed(2)}, 涨跌额=${change.toFixed(2)}, 涨跌幅=${changePercent.toFixed(2)}%`);
+
+    // 备用方案：如果没有传入前一日收盘价且开盘价无效，尝试使用API提供的涨跌数据
+    if (!previousClose && basePrice === open && (latestData.涨跌 !== undefined || latestData.涨跌幅 !== undefined)) {
+      if (latestData.涨跌 !== undefined) {
+        change = parseFloat(latestData.涨跌) || 0;
+      }
+      if (latestData.涨跌幅 !== undefined) {
+        changePercent = parseFloat(latestData.涨跌幅) || 0;
+      }
+      console.log(`使用API涨跌数据: 涨跌额=${change.toFixed(2)}, 涨跌幅=${changePercent.toFixed(2)}%`);
     }
 
     const metalName = getMetalName(metal);
     console.log(`AKTools - ${metalName}CNY价格: ${price.toFixed(2)}`);
-    console.log(`${metalName}当日高低价: 最高=${high.toFixed(2)}, 最低=${low.toFixed(2)}, 涨跌=${change.toFixed(2)}, 涨跌幅=${changePercent.toFixed(2)}%`);
+    console.log(`${metalName}当日OHLC: 开盘=${open.toFixed(2)}, 最高=${high.toFixed(2)}, 最低=${low.toFixed(2)}, 现价=${price.toFixed(2)}`);
+    console.log(`${metalName}涨跌信息: 涨跌=${change.toFixed(2)}, 涨跌幅=${changePercent.toFixed(2)}%`);
     console.log(`${metalName}API原始数据字段:`, Object.keys(latestData));
     console.log(`${metalName}分时数据总条数:`, data.length);
 
-    return { price, high, low, change, changePercent };
+    return { price, open, high, low, change, changePercent };
   } catch (error) {
     const metalName = getMetalName(metal);
     console.error(`AKTools${metalName}实时数据获取失败:`, error);
@@ -81,6 +189,14 @@ const fetchRealMetalPrice = async (metal: MetalType = 'gold'): Promise<{ price: 
 const fetchHistoricalData = async (metal: MetalType = 'gold', days: number = 30): Promise<CandlestickData[]> => {
   try {
     const metalName = getMetalName(metal);
+
+    // 首先检查缓存
+    const cachedData = getCachedHistoricalData(metal, days);
+    if (cachedData) {
+      return cachedData;
+    }
+
+    // 缓存未命中或已过期，从API获取数据
     const symbol = METAL_SYMBOLS[metal];
     console.log(`🔍 开始获取${days}天的${metalName}CNY历史数据...`);
     console.log(`📡 请求URL: ${AKTOOLS_BASE_URL}/spot_hist_sge?symbol=${symbol}`);
@@ -128,7 +244,57 @@ const fetchHistoricalData = async (metal: MetalType = 'gold', days: number = 30)
     // 按时间排序
     results.sort((a, b) => a.time - b.time);
 
+    // 检查是否需要补充今日数据
+    const today = new Date();
+    const todayTimestamp = Math.floor(new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() / 1000);
+
+    // 检查最新的历史数据是否是今天的
+    const hasToday = results.some(item => {
+      const itemDate = Math.floor(item.time / 86400) * 86400;
+      return itemDate === todayTimestamp;
+    });
+
+    // 如果没有今日数据，尝试从实时接口获取今日OHLC数据
+    if (!hasToday) {
+      try {
+        console.log(`📈 历史数据中没有今日数据，尝试获取今日${metalName}实时OHLC数据...`);
+
+        // 获取前一日收盘价作为基准
+        let previousClose: number | undefined;
+        if (results.length > 0) {
+          previousClose = results[results.length - 1].close;
+          console.log(`🔄 使用前一交易日收盘价作为基准: ${previousClose.toFixed(2)}`);
+        }
+
+        const todayData = await fetchRealMetalPrice(metal, previousClose);
+
+        // 添加今日数据到结果中
+        const todayCandle: CandlestickData = {
+          time: todayTimestamp,
+          open: Number(todayData.open.toFixed(2)),
+          high: Number(todayData.high.toFixed(2)),
+          low: Number(todayData.low.toFixed(2)),
+          close: Number(todayData.price.toFixed(2)), // 使用当前价作为收盘价
+          volume: 0
+        };
+
+        results.push(todayCandle);
+        console.log(`✅ 成功添加今日${metalName}数据: 开盘=${todayCandle.open}, 最高=${todayCandle.high}, 最低=${todayCandle.low}, 当前=${todayCandle.close}`);
+
+        // 重新排序
+        results.sort((a, b) => a.time - b.time);
+      } catch (error) {
+        console.warn(`获取今日${metalName}实时数据失败:`, error);
+      }
+    } else {
+      console.log(`📊 历史数据中已包含今日${metalName}数据`);
+    }
+
     console.log(`AKTools成功获取${results.length}条${metalName}CNY历史数据`);
+
+    // 将数据保存到缓存
+    setCachedHistoricalData(metal, days, results);
+
     return results;
 
   } catch (error) {
@@ -240,13 +406,33 @@ export { getMetalName, fetchMinuteKlineData };
 
 export const fetchMetalPrice = async (metal: MetalType = 'gold'): Promise<MetalPrice | null> => {
   try {
-    const metalData = await fetchRealMetalPrice(metal);
+    // 先获取前一日收盘价
+    let previousClose: number | undefined;
+    try {
+      // 使用缓存获取历史数据来计算前一日收盘价
+      const historicalData = await fetchHistoricalData(metal, 2);
+      if (historicalData.length >= 2) {
+        // 如果有至少2天数据，取倒数第二天的收盘价（前一日收盘价）
+        previousClose = historicalData[historicalData.length - 2].close;
+      } else if (historicalData.length >= 1) {
+        // 如果只有1天数据，使用该天的收盘价
+        previousClose = historicalData[0].close;
+      }
+      if (previousClose) {
+        console.log(`📈 获取到前一日收盘价: ${previousClose.toFixed(2)}`);
+      }
+    } catch (error) {
+      console.warn('获取前一日收盘价失败，将使用开盘价作为基准:', error);
+    }
+
+    const metalData = await fetchRealMetalPrice(metal, previousClose);
     const metalName = getMetalName(metal);
 
     console.log(`CNY${metalName}价格:`, metalData);
 
     return {
       price: Number(metalData.price.toFixed(2)),
+      open: Number(metalData.open.toFixed(2)),
       currency: 'CNY',
       timestamp: Date.now(),
       change: Number(metalData.change.toFixed(2)),

@@ -49,35 +49,6 @@
         </div>
       </div>
 
-      <!-- 24小时统计 -->
-      <div class="space-y-4">
-        <h3 class="text-lg font-semibold text-white border-b border-slate-700 pb-2">
-          24小时统计
-        </h3>
-
-        <div class="grid grid-cols-2 gap-4">
-          <div class="bg-slate-800/50 p-3 rounded-lg">
-            <div class="text-xs text-slate-400 mb-1">最高</div>
-            <div class="text-lg font-semibold text-green-400">
-              {{ currencyInfo.formatPrice(metalPrice.high24h) }}
-            </div>
-          </div>
-
-          <div class="bg-slate-800/50 p-3 rounded-lg">
-            <div class="text-xs text-slate-400 mb-1">最低</div>
-            <div class="text-lg font-semibold text-red-400">
-              {{ currencyInfo.formatPrice(metalPrice.low24h) }}
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-slate-800/50 p-3 rounded-lg">
-          <div class="text-xs text-slate-400 mb-1">成交量</div>
-          <div class="text-lg font-semibold text-blue-400">
-            {{ (metalPrice.volume / 1000000).toFixed(2) }}M
-          </div>
-        </div>
-      </div>
 
       <!-- 金属信息 -->
       <div class="bg-slate-800/30 p-3 rounded-lg">
