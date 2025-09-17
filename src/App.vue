@@ -25,6 +25,11 @@
         </div>
       </div>
 
+      <!-- 钉钉推送服务管理 -->
+      <div class="mt-6">
+        <NotificationPanel />
+      </div>
+
       <!-- 数据说明 -->
       <div class="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
         <div class="flex items-start space-x-3">
@@ -63,7 +68,10 @@ import Header from './components/Header.vue'
 import GoldChart from './components/GoldChart.vue'
 import PriceInfo from './components/PriceInfo.vue'
 import MetalSwitch from './components/MetalSwitch.vue'
+import NotificationPanel from './components/NotificationPanel.vue'
 import { globalMetalData } from './composables/useMetalData'
+import { initializeNotificationService } from './services/autoStart'
+import { stopScheduler } from './services/schedulerService'
 import type { MetalType } from './types/gold'
 
 // 使用全局数据管理
@@ -88,10 +96,16 @@ onMounted(async () => {
   // 初始化数据并启动定时更新
   await initializeData()
   startPriceUpdates()
+
+  // 初始化钉钉推送服务
+  initializeNotificationService()
 })
 
 onUnmounted(() => {
   console.log('🛑 App组件卸载，停止定时更新')
   stopPriceUpdates()
+
+  // 停止钉钉推送服务
+  stopScheduler()
 })
 </script>
