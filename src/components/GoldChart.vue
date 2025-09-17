@@ -75,7 +75,7 @@
       <!-- 悬停提示框 -->
       <div
         v-if="tooltipData && hasData"
-        class="absolute pointer-events-none z-20 bg-slate-800/95 backdrop-blur-sm border border-slate-600 rounded-lg p-3 text-sm text-white shadow-lg"
+        class="absolute pointer-events-none z-20 bg-slate-800/70 backdrop-blur-md border border-slate-600/50 rounded-lg p-3 text-sm text-white shadow-lg"
         :style="{ left: tooltipData.x + 'px', top: tooltipData.y + 'px' }"
       >
         <div class="font-medium mb-2">{{ tooltipData.date }}</div>
