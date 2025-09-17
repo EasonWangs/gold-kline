@@ -190,15 +190,23 @@ const fetchHistoricalData = async (metal: MetalType = 'gold', days: number = 30)
   try {
     const metalName = getMetalName(metal);
 
-    // 首先检查缓存
-    const cachedData = getCachedHistoricalData(metal, days);
-    if (cachedData) {
-      return cachedData;
+    // 首先检查缓存（使用一个固定的缓存键，因为现在返回所有数据）
+    const cacheKey = `${metal}_all`;
+    const cache = historicalDataCache.get(cacheKey);
+
+    if (cache && isCacheValid(cache)) {
+      console.log(`✅ 使用${getMetalName(metal)}历史数据缓存，共${cache.data.length}条数据`);
+      return cache.data;
+    }
+
+    if (cache && !isCacheValid(cache)) {
+      console.log(`⏰ ${getMetalName(metal)}历史数据缓存已过期，清除缓存`);
+      historicalDataCache.delete(cacheKey);
     }
 
     // 缓存未命中或已过期，从API获取数据
     const symbol = METAL_SYMBOLS[metal];
-    console.log(`🔍 开始获取${days}天的${metalName}CNY历史数据...`);
+    console.log(`🔍 开始获取${metalName}CNY所有可用历史数据...`);
     console.log(`📡 请求URL: ${AKTOOLS_BASE_URL}/spot_hist_sge?symbol=${symbol}`);
 
     const response = await axios.get(`${AKTOOLS_BASE_URL}/spot_hist_sge`, {
@@ -216,8 +224,8 @@ const fetchHistoricalData = async (metal: MetalType = 'gold', days: number = 30)
 
     const results: CandlestickData[] = [];
 
-    // 转换数据格式并限制天数
-    const limitedData = data.slice(-days); // 取最近的数据
+    // 转换所有可用数据格式（不限制天数，显示API返回的所有数据）
+    const limitedData = data; // 使用所有可用数据
 
     limitedData.forEach((item: any) => {
       if (!item.date || !item.open || !item.close || !item.high || !item.low) {
@@ -292,8 +300,15 @@ const fetchHistoricalData = async (metal: MetalType = 'gold', days: number = 30)
 
     console.log(`AKTools成功获取${results.length}条${metalName}CNY历史数据`);
 
-    // 将数据保存到缓存
-    setCachedHistoricalData(metal, days, results);
+    // 将数据保存到缓存（使用新的缓存键）
+    const cacheData: HistoricalDataCache = {
+      data: results,
+      timestamp: Date.now(),
+      metal,
+      days: results.length // 使用实际数据长度
+    };
+    historicalDataCache.set(cacheKey, cacheData);
+    console.log(`💾 ${getMetalName(metal)}历史数据已缓存，共${results.length}条数据`);
 
     return results;
 
@@ -402,15 +417,38 @@ const fetchMinuteKlineData = async (metal: MetalType = 'gold'): Promise<Candlest
   }
 };
 
-export { getMetalName, fetchMinuteKlineData };
+export { getMetalName, fetchMinuteKlineData, fetchRealMetalPrice };
 
 export const fetchMetalPrice = async (metal: MetalType = 'gold'): Promise<MetalPrice | null> => {
   try {
     // 先获取前一日收盘价
     let previousClose: number | undefined;
     try {
-      // 使用缓存获取历史数据来计算前一日收盘价
-      const historicalData = await fetchHistoricalData(metal, 2);
+      // 优先尝试从所有数据缓存中获取前一日收盘价，避免重复请求
+      const cacheKey = `${metal}_all`;
+      let cache = historicalDataCache.get(cacheKey);
+      let cachedData = cache?.data;
+
+      // 如果第一次没找到缓存，等待100ms再检查一次（图表可能正在加载）
+      if (!cachedData || cachedData.length < 2) {
+        console.log(`⏳ 等待图表缓存建立...`);
+        await new Promise(resolve => setTimeout(resolve, 100));
+        cache = historicalDataCache.get(cacheKey);
+        cachedData = cache?.data;
+      }
+
+      let historicalData: CandlestickData[];
+
+      if (cachedData && cachedData.length >= 2) {
+        // 使用已缓存的所有数据
+        historicalData = cachedData;
+        console.log(`📈 使用缓存的所有历史数据计算前一日收盘价`);
+      } else {
+        // 如果确实没有缓存，直接请求所有数据（与图表需求一致，避免重复请求）
+        historicalData = await fetchHistoricalData(metal);
+        console.log(`📈 请求所有历史数据计算前一日收盘价（同时满足图表需求）`);
+      }
+
       if (historicalData.length >= 2) {
         // 如果有至少2天数据，取倒数第二天的收盘价（前一日收盘价）
         previousClose = historicalData[historicalData.length - 2].close;

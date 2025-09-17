@@ -165,6 +165,10 @@ const props = defineProps<{
   metal: MetalType
 }>()
 
+// 使用全局数据管理
+import { globalMetalData } from '../composables/useMetalData'
+const { historicalData, loadHistoricalData, loadMinuteData } = globalMetalData
+
 const chartContainer = ref<HTMLDivElement>()
 const chartLoading = ref(true)
 const hasData = ref(false)
@@ -425,10 +429,11 @@ const loadData = async () => {
     // 根据时间周期选择不同的数据源
     if (timeframe.value === '1m') {
       // 1分钟使用分时数据
-      data = await fetchMinuteKlineData(props.metal)
+      data = await loadMinuteData()
     } else {
-      // 其他周期使用历史数据
-      data = await fetchHistoricalData(props.metal, 30)
+      // 其他周期直接使用全局状态中的历史数据
+      console.log(`📊 图表使用全局历史数据，共${historicalData.value.length}条`)
+      data = historicalData.value
     }
 
     if (data.length === 0) {
@@ -452,7 +457,21 @@ const loadData = async () => {
 
       if (lineSeries && chart) {
         lineSeries.setData(lineData)
-        chart.timeScale().fitContent()
+
+        // 1分钟数据默认显示最近的合适时间范围（比如最近4小时）
+        if (lineData.length > 240) { // 超过240个点（4小时）
+          const recentData = lineData.slice(-240)
+          const startTime = recentData[0].time
+          const endTime = recentData[recentData.length - 1].time
+
+          chart.timeScale().setVisibleRange({
+            from: startTime,
+            to: endTime
+          })
+        } else {
+          chart.timeScale().fitContent()
+        }
+
         hasData.value = true
       }
     } else {
@@ -461,7 +480,21 @@ const loadData = async () => {
 
       if (candlestickSeries && chart) {
         candlestickSeries.setData(lightweightChartData)
-        chart.timeScale().fitContent()
+
+        // 设置显示最近30天的数据
+        if (lightweightChartData.length > 30) {
+          const last30Days = lightweightChartData.slice(-30)
+          const startTime = last30Days[0].time
+          const endTime = last30Days[last30Days.length - 1].time
+
+          chart.timeScale().setVisibleRange({
+            from: startTime,
+            to: endTime
+          })
+        } else {
+          chart.timeScale().fitContent()
+        }
+
         hasData.value = true
       }
     }
@@ -478,6 +511,14 @@ const refreshChart = async () => {
   if (!candlestickSeries && !lineSeries) return
   await loadData() // 复用loadData的逻辑
 }
+
+// 监听全局历史数据变化，当数据更新时重新加载图表
+watch(() => historicalData.value, async (newData) => {
+  if (newData.length > 0 && chart) {
+    console.log(`📊 检测到历史数据更新，重新加载图表数据`)
+    await loadData()
+  }
+}, { immediate: false })
 
 watch(() => props.metal, async () => {
   tooltipData.value = null

@@ -11,7 +11,7 @@
       <div class="mb-6 flex justify-center">
         <MetalSwitch
           :currentMetal="currentMetal"
-          @metal-change="setCurrentMetal"
+          @metal-change="handleMetalChange"
         />
       </div>
 
@@ -58,54 +58,40 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import Header from './components/Header.vue'
 import GoldChart from './components/GoldChart.vue'
 import PriceInfo from './components/PriceInfo.vue'
 import MetalSwitch from './components/MetalSwitch.vue'
-import { fetchMetalPrice, getMetalName } from './services/metalApi'
-import type { MetalPrice, MetalType } from './types/gold'
+import { globalMetalData } from './composables/useMetalData'
+import type { MetalType } from './types/gold'
 
-const metalPrice = ref<MetalPrice | null>(null)
-const loading = ref(true)
-const error = ref<string | null>(null)
-const currentMetal = ref<MetalType>('gold')
+// 使用全局数据管理
+const {
+  currentMetal,
+  metalPrice,
+  loading,
+  error,
+  initializeData,
+  setCurrentMetal,
+  startPriceUpdates,
+  stopPriceUpdates
+} = globalMetalData
 
-let intervalId: NodeJS.Timeout | null = null
-
-const loadMetalPrice = async () => {
-  try {
-    loading.value = true
-    const price = await fetchMetalPrice(currentMetal.value)
-    metalPrice.value = price
-    error.value = null
-  } catch (err) {
-    const metalName = getMetalName(currentMetal.value)
-    error.value = `获取${metalName}价格失败`
-    console.error(`Error fetching ${currentMetal.value} price:`, err)
-  } finally {
-    loading.value = false
-  }
+const handleMetalChange = (metal: MetalType) => {
+  setCurrentMetal(metal)
 }
 
-const setCurrentMetal = (metal: MetalType) => {
-  currentMetal.value = metal
-}
+onMounted(async () => {
+  console.log('🚀 App组件初始化...')
 
-watch(currentMetal, () => {
-  loadMetalPrice()
-})
-
-onMounted(() => {
-  loadMetalPrice()
-
-  // 每30秒更新一次价格
-  intervalId = setInterval(loadMetalPrice, 30000)
+  // 初始化数据并启动定时更新
+  await initializeData()
+  startPriceUpdates()
 })
 
 onUnmounted(() => {
-  if (intervalId) {
-    clearInterval(intervalId)
-  }
+  console.log('🛑 App组件卸载，停止定时更新')
+  stopPriceUpdates()
 })
 </script>
