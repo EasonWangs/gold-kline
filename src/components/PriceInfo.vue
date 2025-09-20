@@ -25,7 +25,7 @@
       <div class="flex items-center justify-center">
         <div class="flex items-center space-x-2">
           <Database class="w-4 h-4 text-green-400" />
-          <span class="text-xs text-green-400">AKTools {{ metalName }}真实数据</span>
+          <span class="text-xs text-green-400">{{ metalName }}实时数据</span>
         </div>
       </div>
 
@@ -75,7 +75,7 @@
           </span>
         </div>
         <div class="text-center text-xs text-slate-500 mt-1">
-          数据来源: AKTools {{ metalName }}真实市场数据
+          数据来源: {{ metalName }}真实市场数据
         </div>
       </div>
 

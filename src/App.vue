@@ -25,37 +25,12 @@
         </div>
       </div>
 
-      <!-- 钉钉推送服务管理 -->
-      <div class="mt-6">
-        <NotificationPanel />
-      </div>
 
-      <!-- 数据说明 -->
-      <div class="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-        <div class="flex items-start space-x-3">
-          <div class="text-blue-400 text-sm">ℹ️</div>
-          <div>
-            <h4 class="text-blue-300 font-medium mb-1">数据说明</h4>
-            <p class="text-blue-200 text-sm">
-              {{
-                currentMetal === 'gold'
-                  ? '人民币价格来自上海金交所Au99.99数据，通过AKTools本地服务获取。'
-                  : '人民币价格来自上海金交所Ag99.99数据，通过AKTools本地服务获取。'
-              }}
-              {{
-                currentMetal === 'gold'
-                  ? '显示单位为人民币/克，符合国内贵金属交易习惯。'
-                  : '显示单位为人民币/千克，符合上海金交所Ag99.99合约标准。'
-              }}
-            </p>
-          </div>
-        </div>
-      </div>
 
       <!-- 数据来源说明 -->
       <div class="mt-6 text-center text-xs text-slate-500">
         <p>
-          数据来源：上海金交所 {{ currentMetal === 'gold' ? 'Au99.99' : 'Ag99.99' }} | AKTools本地服务 | 更新频率：30秒 | {{ currentMetal === 'gold' ? '人民币/克' : '人民币/千克' }}
+          数据来源：上海金交所 {{ currentMetal === 'gold' ? 'Au99.99' : 'Ag99.99' }} | 更新频率：30秒 | {{ currentMetal === 'gold' ? '人民币/克' : '人民币/千克' }}
         </p>
       </div>
     </div>
@@ -68,10 +43,7 @@ import Header from './components/Header.vue'
 import GoldChart from './components/GoldChart.vue'
 import PriceInfo from './components/PriceInfo.vue'
 import MetalSwitch from './components/MetalSwitch.vue'
-import NotificationPanel from './components/NotificationPanel.vue'
 import { globalMetalData } from './composables/useMetalData'
-import { initializeNotificationService } from './services/autoStart'
-import { stopScheduler } from './services/schedulerService'
 import type { MetalType } from './types/gold'
 
 // 使用全局数据管理
@@ -96,16 +68,10 @@ onMounted(async () => {
   // 初始化数据并启动定时更新
   await initializeData()
   startPriceUpdates()
-
-  // 初始化钉钉推送服务
-  initializeNotificationService()
 })
 
 onUnmounted(() => {
   console.log('🛑 App组件卸载，停止定时更新')
   stopPriceUpdates()
-
-  // 停止钉钉推送服务
-  stopScheduler()
 })
 </script>

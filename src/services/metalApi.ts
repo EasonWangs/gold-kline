@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { MetalPrice, MetalType, CandlestickData } from '../types/gold';
 
-// AKTools本地服务配置
-const AKTOOLS_BASE_URL = '/api/public';
+// 本地服务配置
+const API_BASE_URL = '/api/public';
 
 // 贵金属品种配置
 const METAL_SYMBOLS = {
@@ -82,7 +82,7 @@ const getMetalName = (metal: MetalType): string => {
 const fetchRealMetalPrice = async (metal: MetalType = 'gold', previousClose?: number): Promise<{ price: number; open: number; high: number; low: number; change: number; changePercent: number }> => {
   try {
     const symbol = METAL_SYMBOLS[metal];
-    const response = await axios.get(`${AKTOOLS_BASE_URL}/spot_quotations_sge`, {
+    const response = await axios.get(`${API_BASE_URL}/spot_quotations_sge`, {
       params: { symbol },
       timeout: 10000
     });
@@ -100,7 +100,7 @@ const fetchRealMetalPrice = async (metal: MetalType = 'gold', previousClose?: nu
       throw new Error('No valid price data');
     }
 
-    // AKTools返回的价格数据
+    // API返回的价格数据
     let price = parseFloat(latestData.现价);
 
     // 尝试获取真实的OHLC数据
@@ -171,7 +171,7 @@ const fetchRealMetalPrice = async (metal: MetalType = 'gold', previousClose?: nu
     }
 
     const metalName = getMetalName(metal);
-    console.log(`AKTools - ${metalName}CNY价格: ${price.toFixed(2)}`);
+    console.log(`获取${metalName}CNY价格: ${price.toFixed(2)}`);
     console.log(`${metalName}当日OHLC: 开盘=${open.toFixed(2)}, 最高=${high.toFixed(2)}, 最低=${low.toFixed(2)}, 现价=${price.toFixed(2)}`);
     console.log(`${metalName}涨跌信息: 涨跌=${change.toFixed(2)}, 涨跌幅=${changePercent.toFixed(2)}%`);
     console.log(`${metalName}API原始数据字段:`, Object.keys(latestData));
@@ -180,7 +180,7 @@ const fetchRealMetalPrice = async (metal: MetalType = 'gold', previousClose?: nu
     return { price, open, high, low, change, changePercent };
   } catch (error) {
     const metalName = getMetalName(metal);
-    console.error(`AKTools${metalName}实时数据获取失败:`, error);
+    console.error(`${metalName}实时数据获取失败:`, error);
     throw error;
   }
 };
@@ -207,9 +207,9 @@ const fetchHistoricalData = async (metal: MetalType = 'gold', days: number = 30)
     // 缓存未命中或已过期，从API获取数据
     const symbol = METAL_SYMBOLS[metal];
     console.log(`🔍 开始获取${metalName}CNY所有可用历史数据...`);
-    console.log(`📡 请求URL: ${AKTOOLS_BASE_URL}/spot_hist_sge?symbol=${symbol}`);
+    console.log(`📡 请求URL: ${API_BASE_URL}/spot_hist_sge?symbol=${symbol}`);
 
-    const response = await axios.get(`${AKTOOLS_BASE_URL}/spot_hist_sge`, {
+    const response = await axios.get(`${API_BASE_URL}/spot_hist_sge`, {
       params: { symbol },
       timeout: 15000
     });
@@ -245,7 +245,7 @@ const fetchHistoricalData = async (metal: MetalType = 'gold', days: number = 30)
         high: Number(high.toFixed(2)),
         low: Number(low.toFixed(2)),
         close: Number(close.toFixed(2)),
-        volume: 0 // AKTools不提供成交量数据
+        volume: 0 // API不提供成交量数据
       });
     });
 
@@ -298,7 +298,7 @@ const fetchHistoricalData = async (metal: MetalType = 'gold', days: number = 30)
       console.log(`📊 历史数据中已包含今日${metalName}数据`);
     }
 
-    console.log(`AKTools成功获取${results.length}条${metalName}CNY历史数据`);
+    console.log(`成功获取${results.length}条${metalName}CNY历史数据`);
 
     // 将数据保存到缓存（使用新的缓存键）
     const cacheData: HistoricalDataCache = {
@@ -314,7 +314,7 @@ const fetchHistoricalData = async (metal: MetalType = 'gold', days: number = 30)
 
   } catch (error) {
     const metalName = getMetalName(metal);
-    console.error(`AKTools${metalName}历史数据获取失败:`, error);
+    console.error(`${metalName}历史数据获取失败:`, error);
     return []; // 返回空数组表示数据不可用
   }
 };
@@ -326,7 +326,7 @@ const fetchMinuteKlineData = async (metal: MetalType = 'gold'): Promise<Candlest
     const symbol = METAL_SYMBOLS[metal];
     console.log(`📈 开始获取${metalName}1分钟K线数据...`);
 
-    const response = await axios.get(`${AKTOOLS_BASE_URL}/spot_quotations_sge`, {
+    const response = await axios.get(`${API_BASE_URL}/spot_quotations_sge`, {
       params: { symbol },
       timeout: 10000
     });

@@ -145,7 +145,7 @@
       <div class="text-xs">
         {{
           hasData
-            ? `数据来源: AKTools ${metalName}真实历史数据 (${currencyInfo.unit})`
+            ? `数据来源: ${metalName}真实历史数据 (${currencyInfo.unit})`
             : `当前仅显示${metalName}实时价格数据 - 历史数据需要API配额支持`
         }}
       </div>
