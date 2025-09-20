@@ -7,6 +7,7 @@ export default defineConfig({
     port: 5081,
     host: '0.0.0.0',
     open: false,
+    allowedHosts: ['cssass.com', '127.0.0.1', 'localhost'],
     proxy: {
       '/api/gold': {
         target: 'http://127.0.0.1:5080',
