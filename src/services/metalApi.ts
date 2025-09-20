@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { MetalPrice, MetalType, CandlestickData } from '../types/gold';
 
-// 本地服务配置
-const API_BASE_URL = '/api/public';
+// API服务配置
+const API_BASE_URL = '/api/gold';
 
 // 贵金属品种配置
 const METAL_SYMBOLS = {
@@ -87,7 +87,17 @@ const fetchRealMetalPrice = async (metal: MetalType = 'gold', previousClose?: nu
       timeout: 10000
     });
 
-    const data = response.data;
+    const responseData = response.data;
+
+    // 处理新的API数据格式（带有data包装层）
+    let data;
+    if (responseData && typeof responseData === 'object' && 'data' in responseData) {
+      data = responseData.data;
+      console.log(`✅ API返回新格式数据，总条数: ${responseData.count || data.length}`);
+    } else {
+      // 兼容旧格式
+      data = responseData;
+    }
 
     if (!Array.isArray(data) || data.length === 0) {
       throw new Error('Invalid API response');
@@ -216,7 +226,17 @@ const fetchHistoricalData = async (metal: MetalType = 'gold', days: number = 30)
 
     console.log(`✅ ${metalName}历史数据请求成功，状态码:`, response.status);
 
-    const data = response.data;
+    const responseData = response.data;
+
+    // 处理新的API数据格式（带有data包装层）
+    let data;
+    if (responseData && typeof responseData === 'object' && 'data' in responseData) {
+      data = responseData.data;
+      console.log(`✅ API返回新格式历史数据，总条数: ${responseData.count || data.length}`);
+    } else {
+      // 兼容旧格式
+      data = responseData;
+    }
 
     if (!Array.isArray(data) || data.length === 0) {
       throw new Error('Invalid historical data response');
@@ -331,7 +351,17 @@ const fetchMinuteKlineData = async (metal: MetalType = 'gold'): Promise<Candlest
       timeout: 10000
     });
 
-    const data = response.data;
+    const responseData = response.data;
+
+    // 处理新的API数据格式（带有data包装层）
+    let data;
+    if (responseData && typeof responseData === 'object' && 'data' in responseData) {
+      data = responseData.data;
+      console.log(`✅ API返回新格式分时数据，总条数: ${responseData.count || data.length}`);
+    } else {
+      // 兼容旧格式
+      data = responseData;
+    }
 
     if (!Array.isArray(data) || data.length === 0) {
       throw new Error('Invalid minute data response');
