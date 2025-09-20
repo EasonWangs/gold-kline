@@ -5,7 +5,8 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     port: 5081,
-    open: true,
+    host: '0.0.0.0',
+    open: false,
     proxy: {
       '/api/gold': {
         target: 'http://127.0.0.1:5080',
