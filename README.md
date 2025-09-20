@@ -1,27 +1,27 @@
-# 黄金K线图 - 实时监测应用
+# 贵金属价格监测应用
 
-一个基于AKTools本地服务的黄金价格实时监测应用，使用上海金交所数据提供专业的K线图表和价格分析功能。
+一个基于 Vue.js 的实时贵金属（黄金/白银）价格监测应用，支持多金属切换，提供专业的K线图表和价格分析功能。
 
 ## 🌟 功能特性
 
-- **实时价格监测**: 每30秒自动更新上海金交所Au99.99黄金价格
-- **多货币支持**: 支持美元/盎司和人民币/克双货币切换
-- **专业K线图**: 使用 TradingView 的 lightweight-charts 库
-- **真实历史数据**: 基于AKTools本地服务，获取上海金交所历史K线数据
-- **本地数据源**: 使用本地部署的AKTools服务，数据稳定可靠
-- **价格统计**: 显示当日最高价、最低价等价格信息
-- **趋势分析**: 实时显示价格变化和市场趋势
+- **多贵金属支持**: 支持黄金(Au99.99)和白银(Ag99.99)价格监测
+- **实时价格更新**: 自动获取上海金交所最新价格数据
+- **专业K线图**: 使用 TradingView Lightweight Charts 库
+- **多时间周期**: 支持日线和1分钟线图表
+- **智能数据缓存**: 避免重复API请求，提升性能
+- **价格趋势分析**: 实时显示涨跌幅和价格变化
 - **响应式设计**: 完美适配桌面和移动设备
-- **现代UI**: 使用 Tailwind CSS 打造的美观界面
+- **现代UI**: 基于 Tailwind CSS 的美观界面
 
 ## 🛠️ 技术栈
 
-- **前端框架**: React 18 + TypeScript
+- **前端框架**: Vue 3 + Composition API + TypeScript
 - **构建工具**: Vite
-- **图表库**: Lightweight Charts (TradingView)
+- **图表库**: TradingView Lightweight Charts
 - **样式框架**: Tailwind CSS
-- **图标库**: Lucide React
+- **图标库**: Lucide Vue Next
 - **HTTP客户端**: Axios
+- **日期处理**: Day.js
 
 ## 📦 安装和运行
 
@@ -36,167 +36,199 @@ cd gold-kline
 npm install
 ```
 
-### 3. 确保AKTools服务运行
-确保本地AKTools服务已启动并在 `http://127.0.0.1:8888` 运行
-
-### 4. 启动开发服务器
+### 3. 启动开发服务器
 ```bash
 npm run dev
 ```
 
-应用将在 `http://localhost:3000` 启动。
+应用将在 `http://localhost:5081` 启动。
 
-### 5. 构建生产版本
+### 4. 构建生产版本
 ```bash
 npm run build
 ```
 
-## 🌐 数据源
+## 🌐 API服务
 
-### AKTools本地服务
-- **数据源**: 上海金交所 (Shanghai Gold Exchange)
-- **服务地址**: `http://127.0.0.1:8888/api/public`
-- **实时数据**: `spot_quotations_sge` 接口
-- **历史数据**: `spot_hist_sge` 接口
-- **黄金品种**: Au99.99 (上海金交所标准黄金)
+### 数据源配置
+- **服务地址**: `http://127.0.0.1:5080/api/gold`
+- **代理配置**: Vite开发服务器代理到本地API服务
+- **实时数据**: `/spot_quotations_sge` 接口
+- **历史数据**: `/spot_hist_sge` 接口
 
-### 汇率转换
-- **美元汇率**: 通过Coinbase免费API获取实时USD/CNY汇率
-- **单位转换**: 自动处理人民币/克 ↔ 美元/盎司转换 (1盎司 = 31.1035克)
-- **备用汇率**: 如汇率API不可用，使用默认汇率7.2
+### 支持的贵金属品种
+- **黄金**: Au99.99 (上海金交所标准黄金，人民币/克)
+- **白银**: Ag99.99 (上海金交所标准白银，人民币/千克)
 
-## 🔧 项目结构
+## 🔧 项目架构
 
 ```
 src/
-├── components/          # React 组件
-│   ├── GoldChart.tsx   # K线图组件
-│   ├── Header.tsx      # 页面头部
-│   ├── PriceInfo.tsx   # 价格信息面板
-│   └── CurrencySwitch.tsx # 货币切换器
-├── services/           # API 服务
-│   └── goldApi.ts      # 多数据源API集成
-├── types/              # TypeScript 类型定义
-│   └── gold.ts         # 黄金相关类型
-├── App.tsx             # 主应用组件
-├── main.tsx            # 应用入口
-└── index.css           # 全局样式
+├── components/              # Vue组件
+│   ├── GoldChart.vue       # K线图表组件
+│   ├── Header.vue          # 页面头部
+│   ├── PriceInfo.vue       # 价格信息面板
+│   └── MetalSwitch.vue     # 贵金属切换器
+├── composables/            # Vue组合式函数
+│   └── useMetalData.ts     # 全局数据管理
+├── services/               # API服务层
+│   └── metalApi.ts         # 贵金属API集成
+├── types/                  # TypeScript类型定义
+│   └── gold.ts             # 贵金属相关类型
+├── App.vue                 # 主应用组件
+└── main.ts                 # 应用入口
 ```
 
-## ⚙️ AKTools服务部署
+## ⚙️ 开发配置
 
-### 本地服务要求
-1. 确保AKTools服务已在本地部署并运行
-2. 服务应在 `http://127.0.0.1:8888` 端口提供服务
-3. 确保以下接口可访问：
-   - `GET /api/public/spot_quotations_sge?symbol=Au99.99`
-   - `GET /api/public/spot_hist_sge?symbol=Au99.99`
+### Vite代理配置
+```typescript
+export default defineConfig({
+  server: {
+    port: 5081,
+    proxy: {
+      '/api/gold': {
+        target: 'http://127.0.0.1:5080',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path
+      }
+    }
+  }
+})
+```
 
-### 服务状态检查
+### API接口测试
 ```bash
-# 检查服务是否运行
-curl http://127.0.0.1:8888
+# 测试黄金实时价格
+curl "http://127.0.0.1:5080/api/gold/spot_quotations_sge?symbol=Au99.99"
 
-# 测试实时价格接口
-curl "http://127.0.0.1:8888/api/public/spot_quotations_sge?symbol=Au99.99"
+# 测试黄金历史数据
+curl "http://127.0.0.1:5080/api/gold/spot_hist_sge?symbol=Au99.99"
 
-# 测试历史数据接口
-curl "http://127.0.0.1:8888/api/public/spot_hist_sge?symbol=Au99.99"
+# 测试白银实时价格
+curl "http://127.0.0.1:5080/api/gold/spot_quotations_sge?symbol=Ag99.99"
 ```
 
 ## 📈 数据格式
 
+### API响应格式
+```json
+{
+  "count": 148,
+  "data": [...],
+  "status": "success",
+  "timestamp": "2025-09-20T13:34:37.000"
+}
+```
+
 ### 实时价格数据
 ```typescript
-interface GoldPrice {
-  price: number;          // 当前价格
-  currency: 'USD' | 'CNY'; // 货币单位
-  timestamp: number;      // 时间戳
-  change: number;         // 价格变化
-  changePercent: number;  // 变化百分比
-  high24h: number;        // 24小时最高价
-  low24h: number;         // 24小时最低价
-  volume: number;         // 成交量
+interface MetalPrice {
+  price: number;           // 当前价格
+  open: number;            // 开盘价
+  currency: string;        // 货币单位
+  timestamp: number;       // 时间戳
+  change: number;          // 价格变化
+  changePercent: number;   // 变化百分比
+  high24h: number;         // 当日最高价
+  low24h: number;          // 当日最低价
+  volume: number;          // 成交量
+  metal: MetalType;        // 金属类型
 }
 ```
 
 ### K线历史数据
 ```typescript
 interface CandlestickData {
-  time: number;           // 时间戳
-  open: number;           // 开盘价
-  high: number;           // 最高价
-  low: number;            // 最低价
-  close: number;          // 收盘价
-  volume: number;         // 成交量
+  time: number;            // 时间戳
+  open: number;            // 开盘价
+  high: number;            // 最高价
+  low: number;             // 最低价
+  close: number;           // 收盘价
+  volume: number;          // 成交量
 }
 ```
 
-## 💱 货币转换
-
-### 支持的货币对
-- **USD/盎司**: 美元每盎司黄金价格
-- **CNY/克**: 人民币每克黄金价格
-
-### 转换逻辑
-- 1盎司 = 31.1035克
-- 实时汇率通过Coinbase API获取
-- 自动处理单位转换和汇率计算
-
 ## 🎨 界面功能
 
-### 价格显示
-- 实时价格更新
-- 涨跌幅显示（绿涨红跌）
-- 24小时价格区间
-- 货币单位切换
+### 贵金属切换
+- 黄金/白银快速切换
+- 自动更新价格和图表数据
+- 单位自动适配（黄金：元/克，白银：元/千克）
+
+### 价格信息面板
+- 实时价格显示
+- 涨跌幅指示（绿涨红跌）
+- 当日开盘价、最高价、最低价
+- 更新时间显示
 
 ### K线图表
+- 日线和1分钟线切换
 - 专业交易图表界面
-- 多时间周期选择
-- 交互式缩放和平移
-- 十字线价格显示
-- 加载状态和错误提示
+- 鼠标悬停显示详细价格信息
+- 图表缩放和滚动功能
+- 30天默认显示范围
 
-## 🚀 部署
+## 🚀 核心特性
 
-### 生产环境部署
-```bash
-npm run build
-```
+### 智能数据管理
+- 全局状态管理（`useMetalData` 组合函数）
+- 并行数据加载（历史数据和实时价格同时获取）
+- 智能缓存机制（24小时缓存过期）
+- 避免重复API请求
 
-### 注意事项
-- 生产环境需要确保AKTools服务可访问
-- 如果部署到服务器，需要修改API地址指向AKTools服务器
-- 可在 `src/services/goldApi.ts` 中配置不同环境的API地址
+### 价格计算逻辑
+- 自动提取9:00:00开盘价
+- 基于分时数据计算当日高低价
+- 使用前一日收盘价计算涨跌幅
+- 实时价格变化监测
 
-## 🔧 配置选项
+### 图表增强功能
+- 鼠标悬停显示涨跌百分比
+- 透明度优化的工具提示
+- 自适应时间轴显示
+- 线图和蜡烛图自动切换
 
-### API 配置
-在 `src/services/goldApi.ts` 中可以配置：
-- AKTools服务地址
-- 请求超时时间
-- 汇率API设置
+## 🔧 开发指南
+
+### 添加新贵金属品种
+1. 在 `types/gold.ts` 中添加新的 `MetalType`
+2. 在 `metalApi.ts` 中更新 `METAL_SYMBOLS` 配置
+3. 在 `MetalSwitch.vue` 中添加切换选项
+
+### 自定义图表配置
+在 `GoldChart.vue` 中可以调整：
+- 图表主题和颜色方案
+- 时间周期和数据范围
+- 交互功能和工具提示
+- 图表尺寸和布局
+
+### API集成修改
+在 `metalApi.ts` 中可以配置：
+- API服务器地址
+- 请求超时设置
 - 错误处理逻辑
+- 数据缓存策略
 
-### 图表配置
-在 `src/components/GoldChart.tsx` 中可以配置：
-- 图表主题和颜色
-- 时间周期选项
-- 图表尺寸
-- 交互功能
+## 📝 运行命令
 
-## 📝 开发说明
+```bash
+# 开发模式
+npm run dev
 
-### 修改数据源
-1. 在 `goldApi.ts` 中修改AKTOOLS_BASE_URL
-2. 根据需要调整数据接口和参数
-3. 测试新数据源的集成
+# 生产构建
+npm run build
 
-### 自定义货币支持
-1. 更新 `CurrencySwitch.tsx` 组件
-2. 在 `goldApi.ts` 中添加新的汇率转换逻辑
-3. 更新类型定义以支持新货币
+# 预览构建结果
+npm run preview
+
+# 代码检查
+npm run lint
+
+# 代码格式化
+npm run lint:fix
+```
 
 ## 🤝 贡献
 
@@ -205,7 +237,3 @@ npm run build
 ## 📄 许可证
 
 MIT License
-
-## 📞 联系方式
-
-如有问题或建议，请联系开发者。 
